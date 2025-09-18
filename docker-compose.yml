@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: markdown-notes-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root123456
+      MYSQL_DATABASE: markdown_notes
+      MYSQL_CHARACTER_SET: utf8mb4
+      MYSQL_COLLATION: utf8mb4_unicode_ci
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - markdown-notes-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: markdown-notes-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - markdown-notes-network
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # Spring Boot Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: markdown-notes-backend
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/markdown_notes?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root123456
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-your-api-key-here}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./uploads:/data/markdown-notes/uploads
+      - ./logs:/logs
+    networks:
+      - markdown-notes-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Vue Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: markdown-notes-frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    networks:
+      - markdown-notes-network
+
+networks:
+  markdown-notes-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  redis_data:
