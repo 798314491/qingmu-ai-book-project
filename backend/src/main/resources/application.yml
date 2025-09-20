@@ -82,6 +82,13 @@ alibaba:
     api-key: sk-6873d82a6bcf4abd9619c6c1fdb5cf3a
     model: qwen-turbo
 
+# CORS Configuration
+cors:
+  allowed-origins: "http://localhost:5173,http://localhost:3000,http://localhost:80,http://localhost,http://127.0.0.1:80,http://127.0.0.1"
+  allowed-methods: "GET,POST,PUT,DELETE,OPTIONS,HEAD,PATCH"
+  allow-credentials: true
+  max-age: 3600
+
 # File Storage Configuration
 storage:
   type: local # local or oss

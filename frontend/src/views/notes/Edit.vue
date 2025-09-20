@@ -1,7 +1,7 @@
 <template>
-  <div class="h-full flex flex-col">
+  <div class="h-full w-full flex flex-col overflow-hidden">
     <!-- 工具栏 -->
-    <div class="bg-white border-b px-4 py-3 flex items-center justify-between">
+    <div class="flex-shrink-0 bg-white border-b px-4 py-3 flex items-center justify-between flex-wrap gap-2">
       <div class="flex items-center space-x-4">
         <button
           @click="goBack"
@@ -17,16 +17,16 @@
           v-model="note.title"
           type="text"
           placeholder="笔记标题"
-          class="text-lg font-medium border-none outline-none bg-transparent"
+          class="text-lg font-medium border-none outline-none bg-transparent flex-1 min-w-0"
           @input="handleTitleChange"
         />
       </div>
       
-      <div class="flex items-center space-x-2">
+      <div class="flex items-center space-x-2 flex-shrink-0">
         <button
           @click="togglePreview"
           :class="[
-            'px-3 py-1 rounded text-sm',
+            'px-3 py-1 rounded text-sm hidden sm:block',
             showPreview 
               ? 'bg-blue-100 text-blue-700' 
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -38,47 +38,48 @@
         <button
           @click="saveNote"
           :disabled="saving"
-          class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+          class="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed min-w-[80px]"
         >
           <svg v-if="saving" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          {{ saving ? '保存中...' : '保存' }}
+          <span v-if="!saving">💾 保存</span>
+          <span v-else>⏳ 保存中...</span>
         </button>
       </div>
     </div>
 
     <!-- 编辑区域 -->
-    <div class="flex-1 flex overflow-hidden">
+    <div class="flex-1 flex overflow-hidden min-h-0">
       <!-- 编辑器 -->
-      <div v-show="!showPreview" class="flex-1 flex flex-col">
+      <div v-show="!showPreview" class="flex-1 flex flex-col min-w-0">
         <textarea
           v-model="note.content"
           ref="editorRef"
           placeholder="开始写作..."
-          class="flex-1 w-full p-4 border-none outline-none resize-none font-mono text-sm leading-relaxed"
+          class="flex-1 w-full p-4 border-none outline-none resize-none font-mono text-sm leading-relaxed overflow-y-auto"
           @input="handleContentChange"
         ></textarea>
       </div>
       
       <!-- 预览区域 -->
-      <div v-show="showPreview" class="flex-1 overflow-auto">
+      <div v-show="showPreview" class="flex-1 overflow-y-auto min-w-0">
         <div class="p-4 prose prose-sm max-w-none" v-html="renderedContent"></div>
       </div>
       
       <!-- 分屏模式 -->
-      <div v-if="splitView" class="flex-1 border-l overflow-auto">
+      <div v-if="splitView" class="flex-1 border-l overflow-y-auto min-w-0">
         <div class="p-4 prose prose-sm max-w-none" v-html="renderedContent"></div>
       </div>
     </div>
 
     <!-- 状态栏 -->
-    <div class="bg-gray-50 border-t px-4 py-2 flex items-center justify-between text-xs text-gray-500">
-      <div class="flex items-center space-x-4">
+    <div class="flex-shrink-0 bg-gray-50 border-t px-4 py-2 flex items-center justify-between text-xs text-gray-500 flex-wrap gap-2">
+      <div class="flex items-center space-x-4 flex-wrap">
         <span>字数: {{ wordCount }}</span>
-        <span>行数: {{ lineCount }}</span>
-        <span v-if="lastSaved">最后保存: {{ formatDate(lastSaved) }}</span>
+        <span class="hidden sm:inline">行数: {{ lineCount }}</span>
+        <span v-if="lastSaved" class="hidden md:inline">最后保存: {{ formatDate(lastSaved) }}</span>
       </div>
       
       <div class="flex items-center space-x-2">
@@ -89,7 +90,8 @@
             class="form-checkbox h-4 w-4 text-blue-600"
             @change="handlePublicChange"
           />
-          <span class="ml-2">公开分享</span>
+          <span class="ml-2 hidden sm:inline">公开分享</span>
+          <span class="ml-2 sm:hidden">🔗</span>
         </label>
       </div>
     </div>
@@ -99,16 +101,18 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { notesApi, type Note, type NoteCreateRequest, type NoteUpdateRequest } from '@/api/notes'
 
 const route = useRoute()
 const router = useRouter()
 
 // 响应式数据
-const note = ref({
-  id: null as number | null,
+const note = ref<Partial<Note>>({
+  id: undefined,
   title: '',
   content: '',
-  isPublic: false
+  isPublic: false,
+  isStarred: false
 })
 
 const saving = ref(false)
@@ -144,10 +148,11 @@ const loadNote = async () => {
   if (noteId === 'new') {
     // 新建笔记
     note.value = {
-      id: null,
+      id: undefined,
       title: '',
       content: '',
-      isPublic: false
+      isPublic: false,
+      isStarred: false
     }
     await nextTick()
     editorRef.value?.focus()
@@ -155,17 +160,8 @@ const loadNote = async () => {
   }
 
   try {
-    // TODO: 调用API获取笔记详情
-    // const response = await api.getNote(noteId)
-    // note.value = response.data
-    
-    // 模拟数据
-    note.value = {
-      id: Number(noteId),
-      title: '示例笔记',
-      content: '# 示例笔记\n\n这是一个**示例**笔记的内容...\n\n## 子标题\n\n* 列表项1\n* 列表项2',
-      isPublic: false
-    }
+    const response = await notesApi.getNoteById(Number(noteId))
+    note.value = response.data.data
   } catch (error) {
     console.error('加载笔记失败:', error)
     router.push('/notes')
@@ -178,16 +174,29 @@ const saveNote = async () => {
   saving.value = true
   try {
     if (note.value.id) {
-      // TODO: 更新笔记
-      // await api.updateNote(note.value.id, note.value)
+      // 更新笔记
+      const updateData: NoteUpdateRequest = {
+        title: note.value.title,
+        content: note.value.content,
+        isPublic: note.value.isPublic,
+        isStarred: note.value.isStarred
+      }
+      const response = await notesApi.updateNote(note.value.id, updateData)
+      note.value = response.data.data
     } else {
-      // TODO: 创建笔记
-      // const response = await api.createNote(note.value)
-      // note.value.id = response.data.id
-      // router.replace(`/notes/${note.value.id}`)
+      // 创建笔记
+      const createData: NoteCreateRequest = {
+        title: note.value.title || '无标题',
+        content: note.value.content,
+        isPublic: note.value.isPublic
+      }
+      const response = await notesApi.createNote(createData)
+      note.value = response.data.data
+      router.replace(`/notes/${note.value.id}`)
     }
     
     lastSaved.value = new Date().toISOString()
+    console.log('笔记保存成功')
   } catch (error) {
     console.error('保存笔记失败:', error)
   } finally {

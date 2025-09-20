@@ -1,5 +1,5 @@
 <template>
-  <div class="px-4 sm:px-6 lg:px-8">
+  <div class="h-full w-full overflow-y-auto px-4 sm:px-6 lg:px-8">
     <!-- 页面标题和操作 -->
     <div class="sm:flex sm:items-center">
       <div class="sm:flex-auto">
@@ -62,11 +62,11 @@
             </div>
           </div>
 
-          <div v-else class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div v-else class="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             <div
               v-for="note in filteredNotes"
               :key="note.id"
-              class="relative group bg-white p-6 rounded-lg shadow-sm ring-1 ring-gray-200 hover:shadow-md transition-shadow cursor-pointer"
+              class="relative group bg-white p-4 sm:p-6 rounded-lg shadow-sm ring-1 ring-gray-200 hover:shadow-md transition-shadow cursor-pointer"
               @click="editNote(note.id)"
             >
               <div class="flex items-start justify-between">
@@ -106,13 +106,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { notesApi, type Note } from '@/api/notes'
 
 const router = useRouter()
 
 // 响应式数据
 const loading = ref(false)
 const searchQuery = ref('')
-const notes = ref<any[]>([])
+const notes = ref<Note[]>([])
 
 // 计算属性
 const filteredNotes = computed(() => {
@@ -127,22 +128,19 @@ const filteredNotes = computed(() => {
 const loadNotes = async () => {
   loading.value = true
   try {
-    // TODO: 调用API获取笔记列表
-    // const response = await api.getNotes()
-    // notes.value = response.data
+    const response = await notesApi.getNotes(1, 50)
     
-    // 模拟数据
-    notes.value = [
-      {
-        id: 1,
-        title: '示例笔记',
-        content: '这是一个示例笔记的内容...',
-        isPublic: false,
-        updatedAt: new Date().toISOString()
-      }
-    ]
+    // 处理分页响应或直接数组响应
+    if (response.data.data.records) {
+      notes.value = response.data.data.records
+    } else if (Array.isArray(response.data.data)) {
+      notes.value = response.data.data
+    } else {
+      notes.value = []
+    }
   } catch (error) {
     console.error('加载笔记失败:', error)
+    notes.value = []
   } finally {
     loading.value = false
   }
@@ -160,9 +158,9 @@ const deleteNote = async (id: number) => {
   if (!confirm('确定要删除这个笔记吗？')) return
   
   try {
-    // TODO: 调用API删除笔记
-    // await api.deleteNote(id)
+    await notesApi.deleteNote(id)
     notes.value = notes.value.filter(note => note.id !== id)
+    console.log('笔记删除成功')
   } catch (error) {
     console.error('删除笔记失败:', error)
   }

@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
+import com.markdown.notes.security.UserPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -101,6 +102,7 @@ public class NoteController {
     }
     
     private Long getUserId(Authentication authentication) {
-        return Long.valueOf(authentication.getName());
+        UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
+        return userPrincipal.getId();
     }
 }

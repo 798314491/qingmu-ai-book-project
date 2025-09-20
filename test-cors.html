@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORS测试工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .log-item {
+            margin: 5px 0;
+            padding: 5px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        button {
+            padding: 8px 16px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 CORS 测试工具</h1>
+    <p>用于测试nginx代理和后端API的跨域配置是否正常工作</p>
+
+    <div class="test-section">
+        <h3>📋 测试配置</h3>
+        <label>
+            API Base URL: 
+            <input type="text" id="apiUrl" value="http://localhost/api" placeholder="http://localhost/api">
+        </label>
+        <br>
+        <label>
+            测试端点: 
+            <input type="text" id="testEndpoint" value="/test/public" placeholder="/test/public">
+        </label>
+    </div>
+
+    <div class="test-section">
+        <h3>🧪 CORS 测试</h3>
+        <button onclick="testPreflight()">测试 OPTIONS 预检请求</button>
+        <button onclick="testSimpleGet()">测试 GET 请求</button>
+        <button onclick="testPostWithAuth()">测试带认证的 POST 请求</button>
+        <button onclick="clearLogs()">清除日志</button>
+    </div>
+
+    <div class="test-section">
+        <h3>📝 测试结果</h3>
+        <div id="logs"></div>
+    </div>
+
+    <script>
+        const logs = document.getElementById('logs');
+        
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `log-item ${type}`;
+            div.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logs.appendChild(div);
+            logs.scrollTop = logs.scrollHeight;
+        }
+        
+        function clearLogs() {
+            logs.innerHTML = '';
+        }
+        
+        async function testPreflight() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            const endpoint = document.getElementById('testEndpoint').value;
+            const url = `${apiUrl}${endpoint}`;
+            
+            log('🔍 开始测试 OPTIONS 预检请求...');
+            log(`请求URL: ${url}`);
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Access-Control-Request-Method': 'POST',
+                        'Access-Control-Request-Headers': 'Content-Type, Authorization',
+                        'Origin': window.location.origin
+                    }
+                });
+                
+                log(`响应状态: ${response.status} ${response.statusText}`, 
+                    response.status === 204 || response.status === 200 ? 'success' : 'error');
+                
+                const corsHeaders = {};
+                for (const [key, value] of response.headers.entries()) {
+                    if (key.toLowerCase().includes('access-control')) {
+                        corsHeaders[key] = value;
+                    }
+                }
+                
+                log(`CORS响应头: ${JSON.stringify(corsHeaders, null, 2)}`);
+                
+                if (corsHeaders['access-control-allow-origin']) {
+                    log('✅ CORS预检请求成功！', 'success');
+                } else {
+                    log('❌ CORS预检请求失败：缺少必要的CORS头部', 'error');
+                }
+            } catch (error) {
+                log(`❌ OPTIONS请求失败: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testSimpleGet() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            const endpoint = document.getElementById('testEndpoint').value;
+            const url = `${apiUrl}${endpoint}`;
+            
+            log('🔍 开始测试 GET 请求...');
+            log(`请求URL: ${url}`);
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Origin': window.location.origin
+                    }
+                });
+                
+                log(`响应状态: ${response.status} ${response.statusText}`, 
+                    response.ok ? 'success' : 'error');
+                
+                if (response.ok) {
+                    const data = await response.text();
+                    log(`响应内容: ${data}`);
+                    log('✅ GET请求成功！', 'success');
+                } else {
+                    log('❌ GET请求失败', 'error');
+                }
+            } catch (error) {
+                log(`❌ GET请求失败: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testPostWithAuth() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            const url = `${apiUrl}/auth/login`;
+            
+            log('🔍 开始测试带认证的 POST 请求...');
+            log(`请求URL: ${url}`);
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer test-token',
+                        'Origin': window.location.origin
+                    },
+                    body: JSON.stringify({
+                        username: 'test',
+                        password: 'test123'
+                    })
+                });
+                
+                log(`响应状态: ${response.status} ${response.statusText}`, 
+                    response.status < 500 ? 'success' : 'error');
+                
+                // 即使请求失败（如401），只要能发出请求就说明CORS工作正常
+                if (response.status !== 0) {
+                    log('✅ POST请求能够发出，CORS配置正常！', 'success');
+                } else {
+                    log('❌ POST请求被阻止', 'error');
+                }
+            } catch (error) {
+                if (error.message.includes('CORS')) {
+                    log(`❌ CORS错误: ${error.message}`, 'error');
+                } else {
+                    log(`📝 其他错误（可能是业务逻辑错误，CORS应该正常）: ${error.message}`);
+                }
+            }
+        }
+        
+        // 页面加载时显示当前域名
+        log(`当前页面域名: ${window.location.origin}`);
+        log('点击上方按钮开始测试CORS配置');
+    </script>
+</body>
+</html>

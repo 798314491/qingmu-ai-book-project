@@ -54,9 +54,9 @@ public class AuthService {
             if (testUser == null) {
                 // 创建test用户
                 testUser = new User();
-                testUser.setUsername("test");
-                testUser.setEmail("test@example.com");
-                testUser.setPassword(passwordEncoder.encode("test123"));
+                testUser.setUsername("hello");
+                testUser.setEmail("admin@admin.com");
+                testUser.setPassword(passwordEncoder.encode("123456"));
                 testUser.setNickname("Test User");
                 testUser.setStatus(1);
                 testUser.setCreatedAt(LocalDateTime.now());

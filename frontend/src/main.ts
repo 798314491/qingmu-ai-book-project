@@ -13,6 +13,7 @@ import './styles/index.scss'
 import './styles/tailwind.css'
 import './styles/markdown.scss'
 import './styles/editor.scss'
+import './styles/responsive.css'
 
 // Highlight.js styles
 import 'highlight.js/styles/github.css'

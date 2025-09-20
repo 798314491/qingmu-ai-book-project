@@ -20,6 +20,8 @@ public class Note implements Serializable {
     private Long id;
     
     private Long userId;
+
+    private Boolean isPublic;
     
     private Long folderId;
     
@@ -46,7 +48,8 @@ public class Note implements Serializable {
     
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
-    
+
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
+
 }

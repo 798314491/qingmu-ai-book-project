@@ -1,22 +1,39 @@
 <template>
-  <div class="h-full flex flex-col">
+  <div class="h-full w-full flex flex-col overflow-hidden chat-container p-4">
+    <!-- 头部工具栏 -->
+    <div class="flex items-center justify-between mb-4 flex-shrink-0">
+      <h3 class="text-lg font-semibold text-gray-900">AI 助手</h3>
+      <div class="flex items-center space-x-2">
+        <button
+          @click="toggleExpanded"
+          class="px-3 py-1 text-sm bg-blue-100 text-blue-600 rounded-md hover:bg-blue-200 transition-colors"
+          :title="isExpanded ? '收起' : '完全展开'"
+        >
+          {{ isExpanded ? '收起' : '展开' }}
+        </button>
+      </div>
+    </div>
+
     <!-- 聊天历史 -->
-    <div class="flex-1 overflow-y-auto mb-4 space-y-4">
+    <div class="flex-1 overflow-y-auto mb-4 space-y-4 min-h-0 scrollbar-thin chat-messages">
       <div v-if="messages.length === 0" class="text-center py-8">
-        <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-        </svg>
+        <!-- AI文字标识 -->
+        <div class="mx-auto h-16 w-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mb-4">
+          <span class="text-white font-bold text-xl">AI</span>
+        </div>
         <p class="text-sm text-gray-500 mb-4">AI助手已准备就绪</p>
         <div class="space-y-2">
           <button
-            @click="sendQuickMessage('帮我润色这段文字')"
+            @click="sendQuickMessage('润色文字')"
             class="block w-full text-left px-3 py-2 text-sm bg-gray-50 hover:bg-gray-100 rounded-md"
+            :disabled="loading"
           >
             💡 润色文字
           </button>
           <button
-            @click="sendQuickMessage('总结一下这段内容')"
+            @click="sendQuickMessage('内容总结')"
             class="block w-full text-left px-3 py-2 text-sm bg-gray-50 hover:bg-gray-100 rounded-md"
+            :disabled="loading"
           >
             📝 内容总结
           </button>
@@ -46,13 +63,13 @@
       >
         <div
           :class="[
-            'max-w-xs lg:max-w-md px-4 py-2 rounded-lg text-sm',
+            'max-w-xs lg:max-w-sm xl:max-w-md px-4 py-2 rounded-lg text-sm break-words',
             message.role === 'user'
               ? 'bg-blue-600 text-white'
               : 'bg-gray-100 text-gray-900'
           ]"
         >
-          <div v-if="message.role === 'assistant' && message.loading" class="flex items-center space-x-2">
+          <div v-if="message.role === 'assistant' && message.loading && !message.content" class="flex items-center space-x-2">
             <div class="flex space-x-1">
               <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
               <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
@@ -83,50 +100,26 @@
       </div>
     </div>
 
-    <!-- 选中文本提示 -->
-    <div v-if="selectedText" class="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-      <div class="flex items-start justify-between">
-        <div class="flex-1">
-          <p class="text-xs text-yellow-800 mb-1">选中的文本：</p>
-          <p class="text-sm text-yellow-900 line-clamp-3">{{ selectedText }}</p>
-        </div>
-        <button
-          @click="clearSelectedText"
-          class="ml-2 text-yellow-600 hover:text-yellow-800"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-    </div>
 
     <!-- 输入框 -->
-    <div class="flex space-x-2">
-      <div class="flex-1">
+    <div class="flex-shrink-0 mt-auto pt-4">
+      <div class="mb-2">
         <textarea
           v-model="inputMessage"
-          placeholder="输入消息..."
-          class="w-full px-3 py-2 border border-gray-300 rounded-md resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          placeholder="输入消息... (按回车发送)"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
           rows="3"
-          @keydown.ctrl.enter="sendMessage"
-          @keydown.meta.enter="sendMessage"
+          @keydown.enter="handleEnterKey"
         ></textarea>
-        <p class="text-xs text-gray-500 mt-1">Ctrl+Enter 发送</p>
+        <p class="text-xs text-gray-500 mt-1">按回车发送消息</p>
       </div>
-      <div class="flex flex-col space-y-2">
+      <div class="flex justify-end">
         <button
           @click="sendMessage"
           :disabled="!inputMessage.trim() || loading"
           class="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          发送
-        </button>
-        <button
-          @click="clearChat"
-          class="px-4 py-2 bg-gray-200 text-gray-700 text-sm rounded-md hover:bg-gray-300"
-        >
-          清空
+          {{ loading ? '发送中...' : '发送' }}
         </button>
       </div>
     </div>
@@ -134,11 +127,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, nextTick } from 'vue'
+import { aiApi, type AiChatRequest } from '@/api/ai'
 
-interface Props {
-  selectedText?: string
-}
+interface Props {}
 
 interface Message {
   id: number
@@ -148,10 +140,14 @@ interface Message {
   timestamp: Date
 }
 
-const props = defineProps<Props>()
+defineProps<Props>()
 const emit = defineEmits<{
   'insert-text': [text: string]
+  'toggle-expanded': []
 }>()
+
+// 展开状态
+const isExpanded = ref(false)
 
 const messages = ref<Message[]>([])
 const inputMessage = ref('')
@@ -159,16 +155,20 @@ const loading = ref(false)
 const messageIdCounter = ref(0)
 
 // 计算属性
-const selectedText = computed(() => props.selectedText)
-
-// 监听选中文本变化
-watch(selectedText, (newText) => {
-  if (newText && inputMessage.value.trim() === '') {
-    inputMessage.value = `针对以下内容：\n"${newText}"\n\n请帮我`
-  }
-})
 
 // 方法
+const toggleExpanded = () => {
+  isExpanded.value = !isExpanded.value
+  emit('toggle-expanded')
+}
+
+const handleEnterKey = (event: KeyboardEvent) => {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault()
+    sendMessage()
+  }
+}
+
 const sendMessage = async () => {
   if (!inputMessage.value.trim() || loading.value) return
 
@@ -193,48 +193,97 @@ const sendMessage = async () => {
   loading.value = true
 
   try {
-    // TODO: 调用AI API
-    // const response = await aiApi.chat({
-    //   message: currentMessage,
-    //   context: selectedText.value
-    // })
+    const chatRequest: AiChatRequest = {
+      message: currentMessage,
+      context: '',
+      type: 'chat'
+    }
     
-    // 模拟AI响应
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    // 使用流式API
+    await aiApi.streamChat(
+      chatRequest,
+      // onMessage: 接收流式数据
+      (content: string) => {
+        console.log(`[${new Date().toLocaleTimeString()}] 收到流式数据:`, content)
+        
+        // 强制触发Vue响应式更新
+        const newContent = assistantMessage.content + content
+        assistantMessage.content = newContent
+        
+        console.log(`[${new Date().toLocaleTimeString()}] 更新后内容长度:`, assistantMessage.content.length)
+        
+        // 强制触发响应式更新
+        messages.value = [...messages.value]
+        
+        nextTick(() => {
+          scrollToBottom()
+        })
+      },
+      // onComplete: 完成回调
+      () => {
+        assistantMessage.loading = false
+        loading.value = false
+      },
+      // onError: 错误回调
+      (error: string) => {
+        assistantMessage.loading = false
+        assistantMessage.content = `❌ 请求失败：${error}`
+        loading.value = false
+      }
+    )
     
-    const aiResponse = generateMockResponse(currentMessage)
-    
-    assistantMessage.loading = false
-    assistantMessage.content = aiResponse
-  } catch (error) {
+  } catch (error: any) {
     console.error('AI请求失败:', error)
+    console.error('错误详情:', {
+      message: error.message,
+      response: error.response,
+      request: error.request
+    })
+    
+    // 确保loading状态被清除
     assistantMessage.loading = false
-    assistantMessage.content = '抱歉，AI服务暂时不可用，请稍后重试。'
+    
+    // 详细的错误处理
+    if (error.response) {
+      // 服务器返回了错误状态码
+      const status = error.response.status
+      const errorMsg = error.response.data?.message || error.response.data || '服务器错误'
+      
+      if (status === 401) {
+        assistantMessage.content = '请先登录后再使用AI功能。'
+      } else if (status === 403) {
+        assistantMessage.content = '没有权限使用AI功能，请检查账号设置。'
+      } else if (status === 500) {
+        assistantMessage.content = `服务器内部错误：${errorMsg}`
+      } else {
+        assistantMessage.content = `请求失败 (${status})：${errorMsg}`
+      }
+    } else if (error.request) {
+      // 请求发出但没有收到响应（网络问题、CORS等）
+      assistantMessage.content = '网络连接失败，请检查：\n1. 网络连接是否正常\n2. 服务器是否启动\n3. 跨域配置是否正确'
+    } else {
+      // 其他错误
+      assistantMessage.content = `请求配置错误：${error.message}`
+    }
   } finally {
+    // 确保所有状态都被重置
     loading.value = false
+    assistantMessage.loading = false
+    
     await nextTick()
     scrollToBottom()
   }
 }
 
 const sendQuickMessage = (message: string) => {
+  if (loading.value) {
+    console.warn('AI正在处理请求，请等待...')
+    return
+  }
   inputMessage.value = message
   sendMessage()
 }
 
-const generateMockResponse = (userMessage: string): string => {
-  if (userMessage.includes('润色')) {
-    return '我可以帮您润色文字，让表达更加优雅和准确。请提供需要润色的文本，我会为您提供改进建议。'
-  } else if (userMessage.includes('总结')) {
-    return '我可以帮您总结内容的要点。请提供需要总结的文本，我会提取关键信息并整理成简洁的摘要。'
-  } else if (userMessage.includes('翻译')) {
-    return '我可以帮您翻译文本。请提供需要翻译的内容，我会为您提供准确的翻译结果。'
-  } else if (userMessage.includes('代码')) {
-    return '我可以帮您解释代码的功能和逻辑。请提供需要解释的代码片段，我会详细说明其工作原理。'
-  } else {
-    return `您好！我是AI助手，我理解您的问题是："${userMessage}"。我会尽力为您提供帮助。由于这是演示版本，实际的AI功能需要连接到通义千问API才能正常工作。`
-  }
-}
 
 const copyToClipboard = async (text: string) => {
   try {
@@ -249,18 +298,14 @@ const insertToNote = (text: string) => {
   emit('insert-text', text)
 }
 
-const clearSelectedText = () => {
-  // 清空选中文本的逻辑由父组件处理
-}
 
-const clearChat = () => {
-  messages.value = []
-  messageIdCounter.value = 0
-}
 
 const scrollToBottom = () => {
   // 滚动到底部的逻辑
 }
+
+
+
 </script>
 
 <style scoped>
@@ -282,5 +327,47 @@ const scrollToBottom = () => {
 
 .animate-bounce {
   animation: bounce 1.4s infinite;
+}
+
+/* 自定义滚动条样式 */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+  transition: background-color 0.2s ease;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:active {
+  background: #64748b;
+}
+
+/* 确保聊天区域有足够的高度 */
+.chat-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 </style>

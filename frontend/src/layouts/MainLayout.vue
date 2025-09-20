@@ -1,7 +1,7 @@
 <template>
-  <div class="h-screen flex flex-col bg-gray-50">
+  <div class="h-screen w-screen flex flex-col bg-gray-50 overflow-hidden">
     <!-- 顶部工具栏 -->
-    <header class="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between">
+    <header class="flex-shrink-0 bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between">
       <div class="flex items-center space-x-4">
         <!-- Logo -->
         <div class="flex items-center space-x-2">
@@ -35,12 +35,12 @@
       <!-- 用户信息和操作 -->
       <div class="flex items-center space-x-4">
         <!-- 搜索框 -->
-        <div class="relative">
+        <div class="relative hidden md:block">
           <input
             v-model="searchQuery"
             type="text"
             placeholder="搜索笔记..."
-            class="w-64 px-3 py-1.5 pl-9 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            class="w-48 lg:w-64 px-3 py-1.5 pl-9 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             @keyup.enter="handleSearch"
           />
           <svg class="absolute left-3 top-2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -52,16 +52,17 @@
         <button
           @click="toggleAiPanel"
           :class="[
-            'p-2 rounded-md transition-colors',
+            'px-3 py-2 rounded-md transition-colors font-medium text-sm',
             showAiPanel 
               ? 'bg-blue-100 text-blue-600' 
               : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
           ]"
           title="切换AI助手"
         >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-          </svg>
+          <span class="flex items-center space-x-1">
+            <span class="text-lg">🤖</span>
+            <span>AI</span>
+          </span>
         </button>
         
         <!-- 用户菜单 -->
@@ -99,12 +100,23 @@
     </header>
 
     <!-- 主内容区域 -->
-    <div class="flex-1 flex overflow-hidden">
+    <div class="flex-1 flex overflow-hidden min-h-0">
+      <!-- 移动端遮罩 -->
+      <div 
+        v-if="showSidebar && isMobile" 
+        @click="closeSidebar"
+        class="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+      ></div>
+      
       <!-- 左侧边栏 - 文件目录树 -->
       <aside
         :class="[
-          'bg-white border-r border-gray-200 transition-all duration-300',
-          showSidebar ? 'w-64' : 'w-0 overflow-hidden'
+          'bg-white border-r border-gray-200 transition-all duration-300 flex-shrink-0',
+          showSidebar 
+            ? isMobile 
+              ? 'fixed left-0 top-16 bottom-0 w-64 z-50 md:relative md:top-0' 
+              : 'w-64' 
+            : 'w-0 overflow-hidden'
         ]"
       >
         <div class="h-full flex flex-col">
@@ -230,23 +242,54 @@
       </aside>
 
       <!-- 中间编辑区域 -->
-      <main class="flex-1 flex flex-col overflow-hidden">
+      <main class="flex-1 flex flex-col overflow-hidden min-w-0">
         <router-view :selected-note="selectedNote" @note-updated="handleNoteUpdated" />
       </main>
 
       <!-- 右侧AI面板 -->
       <aside
         :class="[
-          'bg-white border-l border-gray-200 transition-all duration-300',
-          showAiPanel ? 'w-80' : 'w-0 overflow-hidden'
+          'bg-white border-l border-gray-200 transition-all duration-300 flex-shrink-0',
+          showAiPanel 
+            ? isMobile 
+              ? 'fixed right-0 top-16 bottom-0 w-96 z-50 md:relative md:top-0' 
+              : isAiExpanded 
+                ? 'fixed right-0 top-16 bottom-0 w-full z-50'
+                : 'w-96'
+            : 'w-0 overflow-hidden'
         ]"
       >
         <div class="h-full flex flex-col">
-          <div class="p-4 border-b border-gray-200">
+          <div class="p-4 border-b border-gray-200 flex-shrink-0 flex items-center justify-between">
             <h3 class="text-sm font-medium text-gray-900">AI 助手</h3>
+            <div class="flex items-center space-x-2">
+              <button
+                v-if="isAiExpanded"
+                @click="isAiExpanded = false"
+                class="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                title="收起"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <button
+                @click="showAiPanel = false"
+                class="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                title="关闭"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
-          <div class="flex-1 p-4">
-            <AiChat v-if="showAiPanel" :selected-text="selectedText" />
+          <div class="flex-1 min-h-0">
+            <AiChat 
+              v-if="showAiPanel" 
+              @insert-text="handleInsertText"
+              @toggle-expanded="handleAiExpanded"
+            />
           </div>
         </div>
       </aside>
@@ -255,10 +298,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 import AiChat from '@/components/AiChat.vue'
+import { notesApi, type Note } from '@/api/notes'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -267,11 +311,26 @@ const router = useRouter()
 const showSidebar = ref(true)
 const showAiPanel = ref(false)
 const showUserMenu = ref(false)
+const isAiExpanded = ref(false)
 const searchQuery = ref('')
-const selectedNote = ref(null)
-const selectedText = ref('')
+const selectedNote = ref<Note | null>(null)
 const currentFilter = ref('all')
-const notes = ref([])
+const notes = ref<Note[]>([])
+const loading = ref(false)
+const isMobile = ref(false)
+
+// 检测屏幕尺寸
+const checkScreenSize = () => {
+  isMobile.value = window.innerWidth < 768
+  
+  // 移动端默认隐藏侧边栏和AI面板
+  if (isMobile.value) {
+    showSidebar.value = false
+    showAiPanel.value = false
+  } else {
+    showSidebar.value = true
+  }
+}
 
 // 计算属性
 const user = computed(() => authStore.user)
@@ -281,7 +340,7 @@ const filteredNotes = computed(() => {
 
   switch (currentFilter.value) {
     case 'starred':
-      filtered = notes.value.filter(note => note.isStarred)
+      filtered = notes.value.filter((note: Note) => note.isStarred)
       break
     case 'recent':
       filtered = notes.value.slice(0, 10)
@@ -291,7 +350,7 @@ const filteredNotes = computed(() => {
   }
 
   if (searchQuery.value) {
-    filtered = filtered.filter(note =>
+    filtered = filtered.filter((note: Note) =>
       note.title?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       note.content?.toLowerCase().includes(searchQuery.value.toLowerCase())
     )
@@ -303,10 +362,28 @@ const filteredNotes = computed(() => {
 // 方法
 const toggleSidebar = () => {
   showSidebar.value = !showSidebar.value
+  
+  // 移动端时，关闭AI面板避免重叠
+  if (isMobile.value && showSidebar.value) {
+    showAiPanel.value = false
+  }
 }
 
 const toggleAiPanel = () => {
   showAiPanel.value = !showAiPanel.value
+  
+  // 移动端时，关闭侧边栏避免重叠
+  if (isMobile.value && showAiPanel.value) {
+    showSidebar.value = false
+  }
+}
+
+const closeSidebar = () => {
+  showSidebar.value = false
+}
+
+const closeAiPanel = () => {
+  showAiPanel.value = false
 }
 
 const createNewNote = () => {
@@ -318,8 +395,30 @@ const createFolder = () => {
   console.log('创建文件夹')
 }
 
-const filterNotes = (filter: string) => {
+const filterNotes = async (filter: string) => {
   currentFilter.value = filter
+  loading.value = true
+  
+  try {
+    let response
+    switch (filter) {
+      case 'starred':
+        response = await notesApi.getStarredNotes()
+        break
+      case 'recent':
+        response = await notesApi.getRecentNotes(10)
+        break
+      default:
+        response = await notesApi.getNotes(1, 50)
+        notes.value = response.data.data.records || response.data.data
+        return
+    }
+    notes.value = response.data.data
+  } catch (error) {
+    console.error('获取笔记失败:', error)
+  } finally {
+    loading.value = false
+  }
 }
 
 const selectNote = (note: any) => {
@@ -339,24 +438,25 @@ const handleNoteUpdated = (updatedNote: any) => {
 }
 
 const loadNotes = async () => {
+  loading.value = true
   try {
-    // TODO: 调用API获取笔记列表
-    // const response = await notesApi.getNotes()
-    // notes.value = response.data.data
+    const response = await notesApi.getNotes(1, 50)
+    console.log('API Response:', response.data)
     
-    // 模拟数据
-    notes.value = [
-      {
-        id: 1,
-        title: '欢迎使用 Markdown Notes',
-        content: '这是您的第一个笔记...',
-        summary: '这是您的第一个笔记，您可以在这里记录想法、知识和灵感。',
-        isStarred: false,
-        updatedAt: new Date().toISOString()
-      }
-    ]
+    // 处理分页响应或直接数组响应
+    if (response.data.data.records) {
+      notes.value = response.data.data.records
+    } else if (Array.isArray(response.data.data)) {
+      notes.value = response.data.data
+    } else {
+      notes.value = []
+    }
   } catch (error) {
     console.error('加载笔记失败:', error)
+    // 如果API调用失败，显示空状态
+    notes.value = []
+  } finally {
+    loading.value = false
   }
 }
 
@@ -383,9 +483,48 @@ const logout = async () => {
   router.push('/login')
 }
 
+// 处理文本选择
+const handleTextSelection = () => {
+  const selection = window.getSelection()
+  if (selection && selection.toString().trim()) {
+    const selected = selection.toString().trim()
+    if (selected.length > 0 && selected.length < 1000) { // 限制选择长度
+      selectedText.value = selected
+      console.log('检测到文本选择:', selected)
+    }
+  }
+}
+
+
+const handleAiExpanded = () => {
+  isAiExpanded.value = !isAiExpanded.value
+  console.log('AI面板展开状态:', isAiExpanded.value)
+}
+
+// 处理插入文本
+const handleInsertText = (text: string) => {
+  // 这里可以添加插入文本到当前笔记的逻辑
+  console.log('插入文本到笔记:', text)
+  // TODO: 实现插入文本到当前编辑的笔记中
+}
+
 // 生命周期
 onMounted(() => {
   loadNotes()
+  checkScreenSize()
+  
+  // 监听窗口大小变化
+  window.addEventListener('resize', checkScreenSize)
+  
+  // 监听文本选择
+  document.addEventListener('mouseup', handleTextSelection)
+  document.addEventListener('keyup', handleTextSelection)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', checkScreenSize)
+  document.removeEventListener('mouseup', handleTextSelection)
+  document.removeEventListener('keyup', handleTextSelection)
 })
 </script>
 
